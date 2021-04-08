@@ -143,7 +143,11 @@ class Clicker:
         self.request_lock()
         # Press exit
         HMC((925 + self.X) * self.get_uniform(0.01), 19 * self.get_uniform(0.01), random.randint(6, 9) * self.speed)
+        time.sleep(random.uniform(0.05, 0.4))
+        p.click()
         change_dir("lobby")
+        time.sleep(random.uniform(1, 2))
+
         self.press_image("leaveNow.png", 0.01, 0.01)
         self.return_lock()
 
@@ -191,4 +195,5 @@ if __name__ == "__main__":
     click_service.start()
 
     clicker = Clicker(0, click_queues[0], master_click_queue)
-    clicker.bet1()
+    clicker.pause()
+    master_click_queue.put(click_package("stop", None))

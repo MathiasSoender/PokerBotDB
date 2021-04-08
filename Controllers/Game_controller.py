@@ -3,6 +3,7 @@ from Player.player_types import BB, BTN, CO, MP, SB, UTG
 import copy
 from Misc.Simulator_package import tree_package
 
+
 class game_controller:
     def __init__(self):
         self.current_turn = 1
@@ -40,7 +41,7 @@ class game_controller:
         if is_local_sim:
             self.selected_nodes.append((new_node, player.win_odds, player))
         else:
-            self.selected_nodes.append((new_node.identifier, player.win_odds, player))
+            self.selected_nodes.append((new_node, player.win_odds, player))
 
         if new_node.identifier.is_action("f"):
             player.folded = True
@@ -141,10 +142,12 @@ class game_controller:
         return winner
 
 
-    def back_prop(self, pot, winner):
+    def back_prop(self, pot, winner, T):
+        updated_nodes = []
         name_winners = [w.name for w in winner]
 
         for node, odds, player in self.selected_nodes:
+            node = T.get_node(node.identifier.name)
             if player.folded:
                 node.data.update(odds, player.chips - 100)
             else:
@@ -156,7 +159,11 @@ class game_controller:
                 else:
                     node.data.update(odds, player.chips - 100)
 
-        return self.selected_nodes
+            T.db.update_node(node, commit=False)
+            updated_nodes.append((node, odds, player))
+
+        T.db.commit()
+        return updated_nodes
 
     def find_next_player(self, current_player, players):
         players.update_remaining()

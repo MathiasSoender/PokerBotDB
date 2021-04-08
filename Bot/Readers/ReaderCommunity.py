@@ -57,6 +57,7 @@ class ReaderCommunity:
     def ReadTurn(self):
         change_dir("cards")
 
+        print("Finding turn card")
         _, card = find_card(self.com4region, self.com4suitRegion)
         self.Turn.append(card)
         print("Turn: " + str(card))
@@ -66,6 +67,7 @@ class ReaderCommunity:
     def ReadRiver(self):
         change_dir("cards")
 
+        print("finding river card")
         _, card = find_card(self.com5region, self.com5suitRegion)
         self.River.append(card)
         print("River: " + str(card))

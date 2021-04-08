@@ -27,6 +27,8 @@ class MiscActions(Thread):
             if not self.Q.empty():
                 return
 
+            time.sleep(1)
+
 
 
 

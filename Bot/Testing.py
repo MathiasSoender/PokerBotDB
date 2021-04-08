@@ -48,8 +48,9 @@ leftTopS = (89, 197, 90, 20)  # Working
 topS = (424, 134, 90, 18)  # working
 rightTopS = (804, 199, 90, 20)  # working
 rightBottomS = (828, 403, 90, 20)  # working
+hero = (475, 520, 90, 20)
 
-im = p.screenshot(region=leftTopS)
+im = p.screenshot(region=top)
 im.show()
 data = pytesseract.image_to_string(im, lang="eng", config='--psm 11 --oem 1')
 print(handle_raw(data))

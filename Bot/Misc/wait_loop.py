@@ -22,8 +22,8 @@ class waitLoops:
             self.rightNumRegion = (486, 456, 28, 30)
 
             self.blankFlopRegion = (330, 255, 100, 70)
-            self.blankTurnRegion = (460, 255, 60, 65)
-            self.blankRiverRegion = (560, 250, 70, 75)
+            self.blankTurnRegion = (510, 255, 60, 65)
+            self.blankRiverRegion = (570, 250, 70, 75)
 
         elif ID == 1:
             pass
@@ -67,7 +67,7 @@ class waitLoops:
                     else:
                         return "preflop"
 
-            time.sleep(0.25)
+            time.sleep(0.5)
 
 
 
@@ -96,7 +96,7 @@ class waitLoops:
                     else:
                         return "flop"
 
-            time.sleep(0.25)
+            time.sleep(0.5)
 
     def beforeRiver(self):
         print("in river loop")
@@ -121,7 +121,7 @@ class waitLoops:
                     else:
                         return "turn"
 
-            time.sleep(0.25)
+            time.sleep(0.5)
 
     def afterRiver(self):
         print("in river after loop")
@@ -137,7 +137,7 @@ class waitLoops:
                 if call is not None:
                     return "river"
 
-            time.sleep(0.25)
+            time.sleep(0.5)
 
 
 
@@ -165,3 +165,10 @@ class waitLoops:
         check = py.locateOnScreen("check.png", confidence=0.80, region=self.checkBtnRegion, grayscale=True)
 
         return call, check
+
+if __name__ == "__main__":
+    W = waitLoops(0,None)
+    time.sleep(1)
+    print(W._find_call_check())
+    print(py.locateOnScreen("noRiver.png", confidence=0.9, region=W.blankRiverRegion))
+

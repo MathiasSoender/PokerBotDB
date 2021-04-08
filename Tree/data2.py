@@ -3,34 +3,37 @@ import random
 
 
 class Data:
-    __slots__ = 'N', 'split_probabilities', 'all_probabilities', 'c_reward', 'fold_node', 'splits'
+    __slots__ = 'N', 'split_probabilities', 'all_probabilities', 'c_reward', 'fold_node', 'total_splits'
 
-    def __init__(self, pre_flop=False, fold_node=False):
+    def __init__(self, pre_flop=False, fold_node=False, total_splits = 5):
         self.N = []
         self.split_probabilities = []
         self.all_probabilities = []
         self.c_reward = []
 
         self.fold_node = False
+        self.total_splits = total_splits
 
         if fold_node:
-            self.splits = [0]
+            splits = [0]
             self.fold_node = True
 
-        elif pre_flop:
-            self.splits = list(range(0, 5))
         else:
-            self.splits = list(range(0, 5))
+            splits = list(range(0, self.total_splits))
 
-        for split in self.splits:
+
+
+
+        for split in splits:
             self.c_reward.append(0)
             self.N.append(0)
             if fold_node:
                 self.split_probabilities.append(0)
                 self.all_probabilities.append(0)
             else:
-                self.split_probabilities.append(1 / max(self.splits) * split)
-                self.all_probabilities.append(1 / max(self.splits) * split)
+                if split != 0:
+                    self.split_probabilities.append(1 / max(splits) * split)
+                self.all_probabilities.append(1 / max(splits) * split)
 
     def __str__(self):
 
@@ -38,18 +41,26 @@ class Data:
                     "Split probabilities: " + str(self.split_probabilities)])
 
     def find_split(self, probability):
+        if self.fold_node:
+            return 0
+        else:
+            splits = list(range(0, self.total_splits-1))
+
         assigned_split = 0
-        for split in reversed(self.splits):
-            if self.split_probabilities[split] <= probability:
-                assigned_split = split
+        for split in reversed(splits):
+            if self.split_probabilities[split] < probability:
+                assigned_split = split + 1
                 break
         return assigned_split
 
     def update_split(self, probability):
         if self.fold_node:
             threshold = 1
+            splits = [0]
         else:
             threshold = 200
+            splits = list(range(0, self.total_splits))
+
 
         if len(self.all_probabilities) > threshold:
             _ = self.all_probabilities.pop(random.randrange(len(self.all_probabilities)))
@@ -57,11 +68,11 @@ class Data:
         else:
             self.all_probabilities.append(probability)
 
-        parition_N = math.floor(len(self.all_probabilities) / len(self.splits))
+        parition_N = math.floor(len(self.all_probabilities) / len(splits))
         self.all_probabilities = sorted(self.all_probabilities)
 
-        for split in self.splits:
-            self.split_probabilities[split] = self.all_probabilities[split * parition_N: (split + 1) * parition_N][0]
+        for split in list(range(0, self.total_splits - 1)):
+            self.split_probabilities[split] = self.all_probabilities[split * parition_N: (split + 1) * parition_N][-1]
 
     def update_N(self, chosen_split):
         self.N[chosen_split] += 1
@@ -82,4 +93,4 @@ class Data:
         if self.fold_node:
             self.c_reward[chosen_split] = reward
         else:
-            self.c_reward[chosen_split] = self.c_reward[chosen_split] * 0.997 + reward
+            self.c_reward[chosen_split] = self.c_reward[chosen_split] * 0.998 + reward

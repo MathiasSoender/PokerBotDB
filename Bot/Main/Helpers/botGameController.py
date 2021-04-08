@@ -2,22 +2,28 @@ import time
 
 from Player.all_players import Players
 from Player.player_types import BB, BTN, CO, MP, SB, UTG
-from Misc.Simulator_package import tree_package, package
+from Misc.Simulator_package import tree_package
 from Tree.Identifier import PN_int_to_string, A_int_to_string
+from Tree.Tree import Tree
 from subtree_trainer.Simulator import sim
 import copy
-import pickle
+import os
+
+
 
 class game_controller:
-    def __init__(self, tree_Q, own_Q, ID):
+    def __init__(self, own_Q, ID):
         self.preflop = True
         self.street = "preflop"
         self.community = []
         self.players = None
         self.hero = None
-        self.tree_Q = tree_Q
         self.own_Q = own_Q
         self.ID = ID
+        dirbefore = os.getcwd()
+        os.chdir("..")
+        self.Tree = Tree()
+        os.chdir(dirbefore)
 
     def start_game(self, deck, heroPos, hand):
         bb = BB.BB(None)
@@ -41,14 +47,12 @@ class game_controller:
 
         if current_player is None:
             current_player = self.players.UTG
-            print("updated")
 
         elif current_player.name == self.hero.name:
             current_player = self.find_next_player(current_player)
 
         if current_node is None:
-            current_node = self.request_node(None, None, None, self.ID)
-            print("requesting")
+            current_node = self.request_node("root")
             current_node.identifier.name = "P:"
 
         while current_player.name != self.hero.name:
@@ -59,7 +63,6 @@ class game_controller:
 
             for name, f_info in folded_info:
                 if current_player.name == name and f_info:
-                    # A simple hack - change the name (Tree Service only looks at name when fetching)
                     current_node.identifier.name += self.update_node_name(current_player.name, "f")
                     folded = True
 
@@ -87,7 +90,7 @@ class game_controller:
                             current_node.identifier.name += self.update_node_name(current_player.name, bet_action)
                             actual_bet = b_info
 
-            current_node = self.request_node(current_node, None, None, self.ID)
+            current_node = self.request_node(current_node.identifier.name)
             self.process_action_human(current_node, current_player, actual_bet)
 
             current_player = self.find_next_player(current_player)
@@ -95,7 +98,9 @@ class game_controller:
         self.players.update_remaining()
         print(current_player)
         print(current_node)
-        return current_node
+        if current_node.identifier.name == "P:":
+            return self.request_node("root")
+        return self.request_node(current_node.identifier.name)
 
     def process_action_human(self, current_node, player, actual_bet):
         if self.preflop:
@@ -124,21 +129,22 @@ class game_controller:
     def do_action_bot(self, current_node, player):
         # Before doing action, check if the node is minimal visited.
 
-        if sum(current_node.data.N) < 200 and current_node.identifier.name != "P:":
-            self.tree_Q.put(tree_package(current_node.identifier.name, None, None, None, "getSubtree", self.ID, None))
-            subTree = self.own_Q.get()
+        if current_node.data.N[current_node.data.find_split(player.win_odds)] < 75 and\
+                current_node.identifier.name != "root":
             start_time = time.time()
             last_two = current_node.identifier.name[-2:]
 
+            current_node_id = copy.deepcopy(current_node.identifier.name)
+
             while start_time + 5 > time.time():
-                subTree = sim(subTree, copy.deepcopy(self.community), copy.deepcopy(self.players),
-                              copy.deepcopy(self.street), copy.deepcopy(last_two))
+                sim(self.Tree, current_node.identifier.name,
+                    copy.deepcopy(self.community), copy.deepcopy(self.players),
+                    copy.deepcopy(self.street), copy.deepcopy(last_two))
 
-            self.tree_Q.put(tree_package(current_node.identifier.name, subTree, None, None, "updateSubtree", self.ID, None))
-
-            current_node = subTree.root
-            print("size of subtree: " + str(len(subTree.nodes)))
-
+            if last_two in ["F:", "T:", "R:"]:
+                current_node = self.request_node(current_node_id[:-2])
+            else:
+                current_node = self.request_node(current_node_id)
 
         new_node, _ = current_node.select_child(player.win_odds, greedy=False)
 
@@ -221,14 +227,9 @@ class game_controller:
 
         return next_player
 
-    def request_node(self, current_node, current_player, all_players, ID):
-        if current_node is not None:
-            self.tree_Q.put(
-                tree_package(current_node.identifier.name, current_player, all_players, None, "process", ID, is_bot=True))
-        else:
-            self.tree_Q.put(tree_package(None, current_player, all_players, None, "root", ID, is_bot=True))
-        current_node = self.own_Q.get()
-        return current_node
+    def request_node(self, current_node_ID):
+        return self.Tree.get_node(current_node_ID)
+
 
     def update_node_name(self, name, action):
         return "(" + name + ", " + action + ")"
@@ -312,7 +313,7 @@ class game_controller:
         return current_player, current_node
 
     def process_unseen_actions_flop(self, current_node, folded_info):
-        current_node = self.request_node(current_node, None, None, self.ID)
+        current_node = self.request_node(current_node.identifier.name)
         print(current_node)
 
         while current_node.children[0].identifier.flop == []:
@@ -333,20 +334,18 @@ class game_controller:
                         else:
                             current_node.identifier.name += self.update_node_name(name, "ca")
 
-                    current_node = self.request_node(current_node, None, None, self.ID)
+                    current_node = self.request_node(current_node.identifier.name)
                     self.process_action_human(current_node, self.players.find_player(name=name), None)
             print(current_node)
         return current_node
 
     def process_unseen_actions_turn(self, current_node, folded_info):
-        current_node = self.request_node(current_node, None, None, self.ID)
+        current_node = self.request_node(current_node.identifier.name)
         print(current_node)
 
         while current_node.children[0].identifier.turn == []:
             name, ac = current_node.children[0].identifier.find_current_street()[-1]
             name = PN_int_to_string(name)
-            ac = A_int_to_string(ac)
-
 
             for p_name, folded in folded_info:
                 if p_name == name:
@@ -358,19 +357,18 @@ class game_controller:
                         else:
                             current_node.identifier.name += self.update_node_name(name, "ca")
 
-                    current_node = self.request_node(current_node, None, None, self.ID)
+                    current_node = self.request_node(current_node.identifier.name)
                     self.process_action_human(current_node, self.players.find_player(name=name), None)
             print(current_node)
         return current_node
 
     def process_unseen_actions_river(self, current_node, folded_info):
-        current_node = self.request_node(current_node, None, None, self.ID)
+        current_node = self.request_node(current_node.identifier.name)
         print(current_node)
 
         while current_node.children[0].identifier.river == []:
             name, ac = current_node.children[0].identifier.find_current_street()[-1]
             name = PN_int_to_string(name)
-            ac = A_int_to_string(ac)
             for p_name, folded in folded_info:
                 if p_name == name:
                     if folded:
@@ -381,7 +379,7 @@ class game_controller:
                         else:
                             current_node.identifier.name += self.update_node_name(name, "ca")
 
-                    current_node = self.request_node(current_node, None, None, self.ID)
+                    current_node = self.request_node(current_node.identifier.name)
                     self.process_action_human(current_node, self.players.find_player(name=name), None)
             print(current_node)
         return current_node

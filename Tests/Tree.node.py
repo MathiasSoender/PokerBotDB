@@ -1,10 +1,7 @@
+from Services.database_SQLite import DB
 from Tree.node import Node
 from Tree.Tree import Tree
-from Tree.data import Data
-import time
 
-T = Tree(path=r"C:\Users\Mathi\Desktop\cards7\Simulator_main\model")
-
-for n in T.nodes.values():
-    if len(n.children) > 5:
-        print(n)
+T = Tree()
+a = T.get_node("root")
+print(a.find_distribution(0.5))

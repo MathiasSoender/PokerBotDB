@@ -1,51 +1,40 @@
-import random
 
+from Services.database_SQLite import DB
 from Tree.node import Node
 from Tree.Identifier import Identifier
 from Tree.data2 import Data
-import pickle
-import gc
-import os
-import shutil
+
 
 
 
 class Tree:
-    def __init__(self, new_tree=False, path="model", root=None):
+    def __init__(self, new_tree=False, path="model_db", root=None):
 
-        self.nodes = {}
-        self.root = root
-        self.rounds_trained = 0
+        self.db = DB(new_tree, path)
 
-
-        # For multi-processing. Is reset for each new train session.
-
-        if not new_tree:
-            self.get_object(path)
-        else:
+        if new_tree:
             if root is None:
                 ID = Identifier()
                 ID.create_name(is_root=True)
                 self.add_node(ID, data=Data(), is_root=True)
-
+                self.root = root
 
     def add_node(self, ID, data=None, is_root=False, parent=None):
+        new_node = Node(ID, data)
+
+
         if is_root:
-            new_node = Node(ID, data)
             ID.create_name()
-            self.root = new_node
-            self.nodes[ID.name] = new_node
-
         else:
-                new_node = Node(ID, data, parent)
-                self.nodes[ID.name] = new_node
-                self.nodes[parent.identifier.name].add_child(new_node)
+            self.db.add_children(parent.identifier.name, new_node.identifier.name, commit=False)
 
+            if parent.children is None:
+                parent.children = []
+            parent.children.append(new_node)
 
-    def print(self):
+        self.db.add_node(new_node, commit=False)
+        self.db.commit()
 
-        for item in self.nodes.values():
-            print(item.__str__())
 
     """ Expand tree with new nodes if possible """
     def expand_tree(self, current_player, all_players, current_node, controller):
@@ -112,103 +101,20 @@ class Tree:
         controller.new_street = [False, ""]
 
 
-    """Saves the tree in different files. Useful as pickle has high memory overhead (5x)"""
-    def to_object(self, path):
-        print("saving tree")
-        if path not in os.listdir():
-            os.makedirs(path)
-        else:
-            shutil.rmtree(path)
-            os.makedirs(path)
+    def get_node(self, node_ID):
+        node = self.db.get_node(node_ID)
+        children_ID = self.db.get_children(node_ID)
+        node.children = []
+        if children_ID is not None:
+            for child_ID in children_ID:
+                child = self.db.get_node(child_ID)
+                node.children.append(child)
 
-        os.chdir(path)
-        if "etc" not in os.listdir():
-            os.makedirs("etc")
-        if "nodes" not in os.listdir():
-            os.makedirs("nodes")
+        return node
 
-        # Dump etc
-        os.chdir("etc")
-        child_map = {}
-        for node in self.nodes.values():
-            if len(node.children) > 0:
-                child_list = []
-                for child in node.children:
-                    child_list.append(child.identifier.name)
-                child_map[node.identifier.name] = child_list
 
-            node.children = None
 
-        pickle.dump(child_map, open("child_map", "wb"), protocol=4)
-        pickle.dump(self.rounds_trained, open("rounds_trained", "wb"), protocol=4)
 
-        del child_map
 
-        os.chdir("..")
-        os.chdir("nodes")
-
-        # Dump nodes, remember to cut children.
-        idx = 0
-        self.root.children = None
-
-        dump_list = [self.root]
-        n_k = list(self.nodes.keys())
-        random.shuffle(n_k)
-
-        for i in range(0, len(n_k)):
-            if ((idx+1) % 100000) == 0:
-
-                pickle.dump(dump_list, open("nodes" + str(idx), "wb"), protocol=4)
-
-                dump_list = []
-
-            self.nodes[n_k[i]].children = None
-            dump_list.append(self.nodes[n_k[i]])
-            self.nodes[n_k[i]] = None
-            n_k[i] = None
-
-            idx += 1
-        pickle.dump(dump_list, open("nodes" + str(idx), "wb"), protocol=4)
-
-        os.chdir("..")
-        os.chdir("..")
-
-    """Gets the tree from different files - rebuilds it. Useful as pickle has high memory overhead (5x)"""
-    def get_object(self, path):
-        os.chdir(path)
-        os.chdir("etc")
-        child_map = pickle.load(open("child_map", "rb"))
-
-        rounds_trained = pickle.load(open("rounds_trained", "rb"))
-        self.rounds_trained = rounds_trained
-        del rounds_trained
-
-        os.chdir("..")
-        os.chdir("nodes")
-
-        all_nodes = {}
-        for node_pack in os.listdir():
-            nodes_list = pickle.load(open(node_pack, "rb"))
-
-            for node in nodes_list:
-                node.children = []
-                all_nodes[node.identifier.name] = node
-
-            del nodes_list
-
-        self.nodes = all_nodes
-        del all_nodes
-
-        self.root = self.nodes["root"]
-        for node in self.nodes.values():
-            children_names = child_map.get(node.identifier.name)
-            # Leaves have no children..
-            if children_names is not None:
-                for c in children_names:
-                    node.children.append(self.nodes[c])
-
-        os.chdir("..")
-        os.chdir("..")
-        del child_map
 
 

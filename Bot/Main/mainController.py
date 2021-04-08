@@ -4,7 +4,6 @@ from Bot.Main.Loop import loop
 from Bot.Misc.MiscActions import MiscActions
 from Services.OddsPrecomputedService import pre_computed_service
 from Misc.Simulator_package import tree_package, pre_computed_package, click_package
-from Services.TreeService import tree_service
 
 from Simulator_main.training_loop import main_loop
 
@@ -17,7 +16,6 @@ class mainController:
 
         # Processes #
         self.click_service = None
-        self.tree_service = None
         self.odds_service = None
         self.trainer_service = None
         self.main_jobs = []
@@ -25,7 +23,6 @@ class mainController:
         # Queues #
         self.master_click_queue = mp.Queue()
         self.master_loop_queue = mp.Queue()
-        self.tree_queue = mp.Queue()
         self.odds_queue = mp.Queue()
         self.tree_odds_queues = []
         self.click_queues = []
@@ -42,26 +39,19 @@ class mainController:
     def start_processes(self):
         # Make processes ready:
         self._start_click_service()
-        self._start_tree_service()
         self._start_odds_service()
-
-        self.tree_queue.get()
 
         if not self.testing:
             self._start_trainer()
         self._start_loops()
 
     def _start_trainer(self):
-        self.trainer_service = mp.Process(target=main_loop, args=(self.tree_odds_queues[-1], self.tree_queue,
-                                                                  self.odds_queue, None, self.trainer_end_Q,
+        self.trainer_service = mp.Process(target=main_loop, args=(self.tree_odds_queues[-1],
+                                                                  self.odds_queue, False, "model_db", None,
+                                                                  self.trainer_end_Q,
                                                                   self.num_tables))
         self.trainer_service.start()
 
-    def _start_tree_service(self):
-        self.tree_service = mp.Process(target=tree_service,
-                                       args=(self.tree_queue, self.tree_odds_queues, False, "model", True))
-
-        self.tree_service.start()
 
     def _start_click_service(self):
 
@@ -81,8 +71,7 @@ class mainController:
             if ID == 0:
                 MA = MiscActions(clicker, self.MA_Q)
                 MA.start()
-            self.main_jobs.append(mp.Process(target=loop, args=(clicker, ID, self.master_loop_queue,
-                                                                self.tree_queue, self.odds_queue,
+            self.main_jobs.append(mp.Process(target=loop, args=(clicker, ID, self.master_loop_queue, self.odds_queue,
                                                                 self.tree_odds_queues[ID])))
             self.main_jobs[ID].start()
 
@@ -99,13 +88,11 @@ class mainController:
             self.trainer_service.join()
 
         self.master_click_queue.put(click_package("stop", 0))
-        self.tree_queue.put(tree_package(None, None, None, None, "stop", None))
         self.odds_queue.put((pre_computed_package(None, None, None, "stop", None)))
         self.MA_Q.put("stop")
 
         self.click_service.join()
         self.odds_service.join()
-        self.tree_service.join()
 
     def pause(self):
         for _ in range(0, self.num_tables):

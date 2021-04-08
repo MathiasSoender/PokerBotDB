@@ -37,6 +37,8 @@ class ReaderActions:
             self.bets[p] = (player_order[p], bet)
 
         print("bets are: " + str(self.bets))
+        print("returned")
+        return
 
     def handle_raw(self, image):
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -66,6 +68,9 @@ class ReaderActions:
                 idx += 1
             except:
                 stop = True
+
+            if idx > 100:
+                print("reader actions stuck")
 
         return float(real_data)
 

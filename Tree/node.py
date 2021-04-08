@@ -35,7 +35,7 @@ class Node:
 
     def find_distribution(self, win_probability, thresh=150):
 
-        def find_denom(n, c=0.997):
+        def find_denom(n, c=0.998):
             return (c ** n - 1) / (c - 1)
 
         softmax_sum = 0
